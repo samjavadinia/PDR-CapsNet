@@ -1,0 +1,1 @@
+python main.py --dset cifar100 --w 32 --nc 100 --ich 3 --fck 1 --fdim 8 --dec_type DECONV --res_folder output-new --drp 0 --aug 1 --nc_recon 1 --hard 1 --checkpoint output-new/CFC-DECONV-cifar100-1-8-0/2/checkpoint.pt
