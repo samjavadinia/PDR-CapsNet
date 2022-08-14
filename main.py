@@ -319,25 +319,12 @@ class CapsuleNet(nn.Module):
 
 
 
-        """
-        implementing Conv without routing paper
-
-        """
 
 
 
 
 
 
-        #self.conv0 = nn.Conv2d(in_channels=in_channels, out_channels=256, kernel_size=9, stride=1)
-        #self.conv1 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=9, stride=2)
-        #self.depthconv0=nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=9,groups=in_channels)
-        #self.pointconv0=nn.Conv2d(in_channels=in_channels, out_channels=256, kernel_size=1)
-
-        #self.depthconv1=nn.Conv2d(in_channels=256, out_channels=256, kernel_size=9,groups=256, stride=2)
-        #self.pointconv1=nn.Conv2d(in_channels=256, out_channels=256, kernel_size=1)
-        #self.depthwise_separable_conv0 = torch.nn.Sequential(self.depthconv0, self.pointconv0)
-        #self.depthwise_separable_conv1 = torch.nn.Sequential(self.depthconv1, self.pointconv1)
 
         self.width = width
         w1=width
@@ -502,34 +489,6 @@ class CapsuleNet(nn.Module):
         classes, reconstructions = self.decoder(res, y, classes)
 
 
-        # classes_1 = (res1 ** 2).sum(dim=-1) ** 0.5 #L2 norm of res (magnitude of output capsules)
-        # classes_1 = F.softmax(classes_1, dim=-1)
-
-        # classes_1, reconstructions_1 = self.decoder(res1, y, classes_1)
-
-        # 
-        # classes_2 = (res2 ** 2).sum(dim=-1) ** 0.5 #L2 norm of res (magnitude of output capsules)
-        # classes_2 = F.softmax(classes_2, dim=-1)
-
-        # classes_2, reconstructions_2 = self.decoder(res2, y, classes_2)
-
-
-        
-        # classes_3 = (res3 ** 2).sum(dim=-1) ** 0.5 #L2 norm of res (magnitude of output capsules)
-        # classes_3 = F.softmax(classes_3, dim=-1)
-
-        # classes_3, reconstructions_3 = self.decoder(res3, y, classes_3)
-
-        # classes = classes_1 + classes_2 + classes_3
-
-        # reconstructions = reconstructions_1 + reconstructions_2 + reconstructions_3
-
-
-
-        # classes = torch.mean(torch.stack([classes_1,classes_2,classes_3]), dim=0)
-
-        # print(f'recons list : {reconstructions_1.size()} {reconstructions_2.size()} {reconstructions_3.size()}')
-        # reconstructions = torch.mean(torch.stack([reconstructions_1 ,reconstructions_2, reconstructions_3]), dim=0)
 
         return classes, reconstructions
 
