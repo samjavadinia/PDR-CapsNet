@@ -3,7 +3,7 @@ Dynamic Routing Between Capsules
 https://arxiv.org/abs/1710.09829
 
 PyTorch implementation by Kenta Iwasaki @ Gram.AI.
-Code Enhancement by Pouya Shiri pouyashiri@gmail.com
+Code Enhancement by Samaneh Javadinia sa.javadinia@gmail.com
 """
 import sys, os
 sys.setrecursionlimit(15000)
