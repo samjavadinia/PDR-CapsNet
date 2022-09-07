@@ -3,7 +3,7 @@ Dynamic Routing Between Capsules
 https://arxiv.org/abs/1710.09829
 
 PyTorch implementation by Kenta Iwasaki @ Gram.AI.
-Code Enhancement by Samaneh Javadinia sa.javadinia@gmail.com
+Code Enhancement by Pouya Shiri pouyashiri@gmail.com
 """
 import sys, os
 sys.setrecursionlimit(15000)
@@ -17,6 +17,11 @@ from torch.optim import Adam
 from torchnet.engine import Engine
 from torchnet.logger import VisdomPlotLogger, VisdomLogger
 from torchvision.utils import make_grid
+
+# from thop import profile
+
+
+from deepspeed.profiling.flops_profiler import get_model_profile
 
 from tqdm import tqdm
 import torchnet as tnt
@@ -228,19 +233,65 @@ class CapsuleLayer(nn.Module):
         self.route_weights = nn.Parameter(torch.randn(num_classes, num_capsules, in_channels, out_channels))
 
     def squash(self, tensor, dim=-1):
-        squared_norm = (tensor ** 2).sum(dim=dim, keepdim=True)
+
+        print('####tensorrrrrrrrrrrrrr',tensor.size())
+
+
+        squashfirst = tensor ** 2
+
+        print('####squashfirst',squashfirst.size())
+
+
+        squashsecond = squashfirst.sum(dim=dim, keepdim=True)
+
+        print('####squashsecondddddddd',squashsecond.size())
+
+
+        squared_norm = squashsecond
+
+
+        # squared_norm = (tensor ** 2).sum(dim=dim, keepdim=True)
+
         scale = squared_norm / (1 + squared_norm)
         return scale * tensor / torch.sqrt(squared_norm)
 
     def forward(self, x):
 
+        nnn=x[None, :, :, None, :]
+        # print('####VOROOOODI affine',nnn.size())
+
+        kkk=self.route_weights[:, None, :, :, :]
+        # print('####Matrix affine',kkk.size())
+
+
+
+
         # print(f'###{x[None, :, :, None, :].size()}-{self.route_weights[:, None, :, :, :].size()}')
         priors = x[None, :, :, None, :] @ self.route_weights[:, None, :, :, :]
 
+
+        # print('#### prioooooooors',priors.size())
+
+
         logits = Variable(torch.zeros(*priors.size())).cuda()
+
+
         for i in range(self.num_iterations):
             probs = softmax(logits, dim=2)
-            outputs = self.squash((probs * priors).sum(dim=2, keepdim=True))
+
+
+            # print('#### probbbbbbs',probs.size())
+            # print('#### prioooooooors',priors.size())
+            
+            nnnnn=(probs * priors).sum(dim=2, keepdim=True)
+
+            # print('#### nnnnn',nnnnn.size())
+
+
+            outputs = self.squash(nnnnn)
+
+            # print('#### OUTPUTTTTS',outputs.size())
+
 
             if i != self.num_iterations - 1:
                 delta_logits = (priors * outputs).sum(dim=-1, keepdim=True)
@@ -319,12 +370,25 @@ class CapsuleNet(nn.Module):
 
 
 
+        """
+        implementing Conv without routing paper
+
+        """
 
 
 
 
 
 
+        #self.conv0 = nn.Conv2d(in_channels=in_channels, out_channels=256, kernel_size=9, stride=1)
+        #self.conv1 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=9, stride=2)
+        #self.depthconv0=nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=9,groups=in_channels)
+        #self.pointconv0=nn.Conv2d(in_channels=in_channels, out_channels=256, kernel_size=1)
+
+        #self.depthconv1=nn.Conv2d(in_channels=256, out_channels=256, kernel_size=9,groups=256, stride=2)
+        #self.pointconv1=nn.Conv2d(in_channels=256, out_channels=256, kernel_size=1)
+        #self.depthwise_separable_conv0 = torch.nn.Sequential(self.depthconv0, self.pointconv0)
+        #self.depthwise_separable_conv1 = torch.nn.Sequential(self.depthconv1, self.pointconv1)
 
         self.width = width
         w1=width
@@ -367,15 +431,15 @@ class CapsuleNet(nn.Module):
         self.fc_out_dim = fc_out_dim
         
         fc_sq_1 = ( w1 ** 2 )
-        print('############fc_sq_1===',fc_sq_1)
+        # print('############fc_sq_1===',fc_sq_1)
 
 
         fc_sq_2 = ( w2 ** 2 )
-        print('############fc_sq_2===',fc_sq_2)
+        # print('############fc_sq_2===',fc_sq_2)
 
  
         fc_sq_3 = ( w3 ** 2 )
-        print('############fc_sq_3===',fc_sq_3)
+        # print('############fc_sq_3===',fc_sq_3)
     
 
         self.caps1 = CapsuleLayer(num_capsules=(fc_sq_1), in_channels=8, out_channels=16,
@@ -409,6 +473,9 @@ class CapsuleNet(nn.Module):
 
     def forward(self, x, y=None):
         x = x.float()
+
+        # print('#####xxxxx',x.size())
+
         # print('X1=====     startttttttttttt',x)
         # print('X1=====     finishhhhhhhhhhh')
 
@@ -447,7 +514,7 @@ class CapsuleNet(nn.Module):
 
 
         cfc1 =self.squash( self.cfc1(x1), dim=-1)
-        # print('CFC1=====',cfc1.size())
+        print('CFC1=====',cfc1.size())
 
 
         cfc2 =self.squash( self.cfc2(x2), dim=-1)
@@ -489,6 +556,34 @@ class CapsuleNet(nn.Module):
         classes, reconstructions = self.decoder(res, y, classes)
 
 
+        # classes_1 = (res1 ** 2).sum(dim=-1) ** 0.5 #L2 norm of res (magnitude of output capsules)
+        # classes_1 = F.softmax(classes_1, dim=-1)
+
+        # classes_1, reconstructions_1 = self.decoder(res1, y, classes_1)
+
+        # 
+        # classes_2 = (res2 ** 2).sum(dim=-1) ** 0.5 #L2 norm of res (magnitude of output capsules)
+        # classes_2 = F.softmax(classes_2, dim=-1)
+
+        # classes_2, reconstructions_2 = self.decoder(res2, y, classes_2)
+
+
+        
+        # classes_3 = (res3 ** 2).sum(dim=-1) ** 0.5 #L2 norm of res (magnitude of output capsules)
+        # classes_3 = F.softmax(classes_3, dim=-1)
+
+        # classes_3, reconstructions_3 = self.decoder(res3, y, classes_3)
+
+        # classes = classes_1 + classes_2 + classes_3
+
+        # reconstructions = reconstructions_1 + reconstructions_2 + reconstructions_3
+
+
+
+        # classes = torch.mean(torch.stack([classes_1,classes_2,classes_3]), dim=0)
+
+        # print(f'recons list : {reconstructions_1.size()} {reconstructions_2.size()} {reconstructions_3.size()}')
+        # reconstructions = torch.mean(torch.stack([reconstructions_1 ,reconstructions_2, reconstructions_3]), dim=0)
 
         return classes, reconstructions
 
@@ -537,57 +632,40 @@ if __name__ == "__main__":
     from torchvision.datasets.svhn import SVHN
     from torchvision.datasets.cifar import CIFAR10
 
+
+
+
+
+
+    # from ptflops import get_model_complexity_info
+
+    # import thop
+
     from tqdm import tqdm
     import torchnet as tnt
     import argparse
 
-    # parser = argparse.ArgumentParser(description="torchCapsNet.")
-    # parser.add_argument('--dset', default='cifar')
-    # parser.add_argument('--nc', default=10, type=int)
-    # parser.add_argument('--w', default=32, type=int)
-    # parser.add_argument('--dpath', default='')
-    # parser.add_argument('--bsize', default=128, type=int)
-
-    # parser.add_argument('--ne', default=100, type=int)
-    # parser.add_argument('--niter', default=3, type=int)
-    # parser.add_argument('--fck', default=1, type=int)
-    # parser.add_argument('--fdim', default=8, type=int)
-    # parser.add_argument('--ich', default=3, type=int)
-    # parser.add_argument('--dec_type', default='DECONV')
-    # parser.add_argument('--drp', default=0, type=float)
-    # parser.add_argument('--res_folder', default='output-new')
-    # parser.add_argument('--aug', default=1, type=int)
-    # parser.add_argument('--nc_recon', default=1, type=int)
-    # parser.add_argument('--hard', default=0, type=int)
-    # parser.add_argument('--checkpoint', default='')
-    # parser.add_argument('--test_only', default=0, type=int)
-    # parser.add_argument('--lr', default=0.001, type=float)
-
-
-    # args = parser.parse_args()
-
     parser = argparse.ArgumentParser(description="torchCapsNet.")
-    parser.add_argument('--dset', default='mnist', required=True)
-    parser.add_argument('--nc', default=10, type=int, required=True)
-    parser.add_argument('--w', default=28, type=int, required=True)
+    parser.add_argument('--dset', default='cifar')
+    parser.add_argument('--nc', default=10, type=int)
+    parser.add_argument('--w', default=32, type=int)
     parser.add_argument('--dpath', default='')
     parser.add_argument('--bsize', default=128, type=int)
 
     parser.add_argument('--ne', default=100, type=int)
     parser.add_argument('--niter', default=3, type=int)
     parser.add_argument('--fck', default=1, type=int)
-    parser.add_argument('--fdim', default=8, type=int, required=True)
-    parser.add_argument('--ich', default=1, type=int, required=True)
+    parser.add_argument('--fdim', default=8, type=int)
+    parser.add_argument('--ich', default=3, type=int)
     parser.add_argument('--dec_type', default='DECONV')
     parser.add_argument('--drp', default=0, type=float)
-    parser.add_argument('--res_folder', default='output', required=True)
+    parser.add_argument('--res_folder', default='output-new')
     parser.add_argument('--aug', default=1, type=int)
-    parser.add_argument('--nc_recon', default=3, type=int, required=True)
-    parser.add_argument('--hard', default=0, type=int, required=True)
+    parser.add_argument('--nc_recon', default=1, type=int)
+    parser.add_argument('--hard', default=0, type=int)
     parser.add_argument('--checkpoint', default='')
-    parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--test_only', default=0, type=int)
-
+    parser.add_argument('--lr', default=0.001, type=float)
 
 
     args = parser.parse_args()
@@ -650,6 +728,54 @@ if __name__ == "__main__":
 
         return loss, classes
 
+
+
+
+
+
+
+
+
+    # with torch.cuda.device(0):
+    model =  CapsuleNet(args.nc, args.niter, width=args.w, in_channels=args.ich, fc_kernel_size=args.fck,
+                       fc_out_dim=args.fdim, nc_recon=args.nc_recon, decoder_type=args.dec_type, drp=args.drp)
+
+    model.cuda()
+
+
+    batch_size = 128
+    flops, macs, params = get_model_profile(model=model, # model
+                                    input_shape=(batch_size, 3, 32, 32), # input shape to the model. If specified, the model takes a tensor with this shape as the only positional argument.
+                                    args=None, # list of positional arguments to the model.
+                                    kwargs=None, # dictionary of keyword arguments to the model.
+                                    print_profile=True, # prints the model graph with the measured profile attached to each module
+                                    detailed=True, # print the detailed profile
+                                    module_depth=-1, # depth into the nested modules, with -1 being the inner most modules
+                                    top_modules=1, # the number of top modules to print aggregated profile
+                                    warm_up=10, # the number of warm-ups before measuring the time of each module
+                                    as_string=True, # print raw numbers (e.g. 1000) or as human-readable strings (e.g. 1k)
+                                    output_file=None, # path to the output file. If None, the profiler prints to stdout.
+                                    ignore_modules=None) # the list of modules to ignore in the profiling
+
+    print("{:<30}  {:<8}".format("#######Batch size: ", batch_size))
+
+    print('-'*50)
+
+    print('{:<30}  {:<8}'.format('######Number of MACs: ', macs))
+
+    print('-'*50)
+
+    print('{:<30}  {:<8}'.format('#######Number of parameters: ', params))
+
+    print('-'*50)
+   
+    print('{:<30}  {:<8}'.format('########Number of flops: ', flops))
+   
+   
+   
+   
+   
+   
    
     model = CapsuleNet(args.nc, args.niter, width=args.w, in_channels=args.ich, fc_kernel_size=args.fck,
                        fc_out_dim=args.fdim, nc_recon=args.nc_recon, decoder_type=args.dec_type, drp=args.drp)
@@ -657,8 +783,59 @@ if __name__ == "__main__":
         print(f'Loading Checkpoint: {args.checkpoint}')
         model.load_state_dict(torch.load(args.checkpoint))
 
-    # model.load_state_dict(torch.load('epochs/epoch_327.pt'))
     model.cuda()
+
+    # print('#######torch.cuda.device_count()',torch.cuda.device_count())
+
+
+
+    
+    # input = torch.randn( args.bsize,args.ich, args.w, args.w)
+
+   
+   
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') 
+    # input = input.to(device)
+    # 
+    # print('####input',input.dtype)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # flops = thop.profile(model,inputs=(input,   ), verbose=True)
+    # print('####floppppps',flops)
+    
+
+    
+    # macs, params= profile(model,inputs=(input,   ))
+
+
+
+    # macs, params = get_model_complexity_info(model, (args.bsize,args.ich, args.w, args.w), as_strings=True,
+                                        #    print_per_layer_stat=True, verbose=True)
+    # print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
+    # print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+
+    
+
 
     # print("# parameters:", sum(param.numel() for param in model.parameters()))
     numparams = sum(param.numel() for param in model.parameters())
