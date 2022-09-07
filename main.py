@@ -234,17 +234,17 @@ class CapsuleLayer(nn.Module):
 
     def squash(self, tensor, dim=-1):
 
-        print('####tensorrrrrrrrrrrrrr',tensor.size())
+        # print('####tensorrrrrrrrrrrrrr',tensor.size())
 
 
         squashfirst = tensor ** 2
 
-        print('####squashfirst',squashfirst.size())
+        # print('####squashfirst',squashfirst.size())
 
 
         squashsecond = squashfirst.sum(dim=dim, keepdim=True)
 
-        print('####squashsecondddddddd',squashsecond.size())
+        # print('####squashsecondddddddd',squashsecond.size())
 
 
         squared_norm = squashsecond
@@ -514,7 +514,7 @@ class CapsuleNet(nn.Module):
 
 
         cfc1 =self.squash( self.cfc1(x1), dim=-1)
-        print('CFC1=====',cfc1.size())
+        # print('CFC1=====',cfc1.size())
 
 
         cfc2 =self.squash( self.cfc2(x2), dim=-1)
