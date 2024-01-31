@@ -1,9 +1,6 @@
 # PDR-CapsNet
 This is the code for Parallel Dynamic Routing Capsule Network (PDR-CapsNet) paper.
 
-The following codes are used for this project:
-
-https://github.com/pouyashiri/CFC-CapsNet.git
 
 # Installation
 Step 1. Install PyTorch and Torchvision:
